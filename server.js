@@ -12,9 +12,9 @@ const Task = require("./models/Task");
 const app = express();
 app.use(bodyParser.json());
 
-
+// Configure CORS
 app.use(cors({
-    origin: "*",
+    origin: "*",  // Change "*" to specific frontend URL(s) for security
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
@@ -50,12 +50,39 @@ app.post("/auth/login", async (req, res) => {
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
-        const token = jwt.sign({ userId: user._id, email }, process.env.JWT_SECRET, { expiresIn: "1day" });
+        const token = jwt.sign({ userId: user._id, email }, process.env.JWT_SECRET, { expiresIn: "1h" });
         res.json({ message: "Login successful", token });
     } catch (error) {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
+app.post("/auth/reset-password", async (req, res) => {
+    try {
+        const { email, oldPassword, newPassword } = req.body;
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: "Incorrect old password" });
+        }
+
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+
+        res.json({ message: "Password reset successful" });
+    } catch (error) {
+        console.error("Error resetting password:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 
 function verifyToken(req, res, next) {
     try {
